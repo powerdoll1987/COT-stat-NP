@@ -38,6 +38,7 @@ if __name__ == '__main__':
     str_NPOI_ZS_KEY = 'NPOI ZS KEY'
     str_NPOI_CHG_ZS_KEY = 'NPOI CHG ZS KEY'
     str_NPOI = 'NPOI'
+    str_NPOI_CHG = 'NPOI CHANGE'
     const_price_roll_span = 40 # 计算未来return用的日数
     
     # 读入数据
@@ -61,10 +62,10 @@ if __name__ == '__main__':
     selDatePrice = price.ix[priceDate].copy()
 
     # 计算pos的Z-SCORE
-    pos[str_LONG_NPOI] = pos.ix[:,0] / pos.ix[:,2]
-    pos[str_SHORT_NPOI] = pos.ix[:,1] / pos.ix[:,2]
-    colNames = [str_LONG_NPOI,str_SHORT_NPOI]
-    newColNames = [str_LONG_ZSCORE, str_SHORT_ZSCORE]
+    pos[str_NPOI] = pos.ix[:,0] / pos.ix[:,1]
+    pos[str_NPOI_CHG] = pos[str_NPOI].diff() # 计算每周Z-Score的变化   
+    colNames = [str_NPOI,str_NPOI_CHG]
+    newColNames = [str_NPOI_ZSCORE, str_NPOI_CHG_ZSCORE]
     funcList = [tf.zscore, tf.zscore]
     pos = tf.rolling(pos, const_zs_roll_span, funcList, colNames, newColNames)
     pos.dropna(inplace = True)
@@ -72,19 +73,19 @@ if __name__ == '__main__':
     # 把pos和price连接, 按周五的公布日期连接
     pos.index = pos.index.shift(3, 'D') # pos的日期是周二，要改成release date周五
     selDatePrice.index = selDatePrice.index.shift(-3, 'D') # price的日期是下周一，也改成周五
-    subPos = pos.ix[:, 0:3].copy() #原始CFTC投机头寸数据
-    subPos[[str_LONG_ZSCORE, str_SHORT_ZSCORE]] = pos[[str_LONG_ZSCORE, str_SHORT_ZSCORE]].copy()
+    subPos = pos.ix[:, 0:2].copy() #原始CFTC投机头寸数据
+    subPos[[str_NPOI_ZSCORE, str_NPOI_CHG_ZSCORE]] = pos[[str_NPOI_ZSCORE, str_NPOI_CHG_ZSCORE]].copy()
     subSelPrice = selDatePrice[[str_NEXT_ND_RETURN, str_NEXT_ND_MAX_DOWN, str_NEXT_ND_MAX_UP]].copy()
     result = pd.concat([subPos, subSelPrice], axis = 1, join = 'inner')
     
     # 按Z-score分组，生成每个分组的统计数据（2维矩阵）
     step = 0.5
-    result[str_LONG_ZS_KEY] = tf.histoCut(result[str_LONG_ZSCORE], step) #产生分组用的key
-    result[str_SHORT_ZS_KEY] = tf.histoCut(result[str_SHORT_ZSCORE], step)
-    matCount = result.groupby([str_LONG_ZS_KEY, str_SHORT_ZS_KEY])[str_NEXT_ND_RETURN].count().unstack()
-    matAveRet = result.groupby([str_LONG_ZS_KEY, str_SHORT_ZS_KEY])[str_NEXT_ND_RETURN].mean().unstack()
-    matUpProb = result.groupby([str_LONG_ZS_KEY, str_SHORT_ZS_KEY])[str_NEXT_ND_RETURN].apply(tf.posPct).unstack()
-    matRiskRet = result.groupby([str_LONG_ZS_KEY, str_SHORT_ZS_KEY]).apply(riskReturn).unstack()
+    result[str_NPOI_ZS_KEY] = tf.histoCut(result[str_NPOI_ZSCORE], step) #产生分组用的key
+    result[str_NPOI_CHG_ZS_KEY] = tf.histoCut(result[str_NPOI_CHG_ZSCORE], step)
+    matCount = result.groupby([str_NPOI_ZS_KEY, str_NPOI_CHG_ZS_KEY])[str_NEXT_ND_RETURN].count().unstack()
+    matAveRet = result.groupby([str_NPOI_ZS_KEY, str_NPOI_CHG_ZS_KEY])[str_NEXT_ND_RETURN].mean().unstack()
+    matUpProb = result.groupby([str_NPOI_ZS_KEY, str_NPOI_CHG_ZS_KEY])[str_NEXT_ND_RETURN].apply(tf.posPct).unstack()
+    matRiskRet = result.groupby([str_NPOI_ZS_KEY, str_NPOI_CHG_ZS_KEY]).apply(riskReturn).unstack()
     matCount = tf.histoSort(matCount)
     matCount = tf.histoSort(matCount.T)
     matAveRet = tf.histoSort(matAveRet)
@@ -95,12 +96,12 @@ if __name__ == '__main__':
     matRiskRet = tf.histoSort(matRiskRet.T)
     
     # 按照最后的Z-score找到以前同一个Z-SCORE分组的数据
-    long_zs_key = tf.histoCutKey(pos.ix[-1, str_LONG_ZSCORE], step)
-    short_zs_key= tf.histoCutKey(pos.ix[-1, str_SHORT_ZSCORE], step)
+    npoi_zs_key = tf.histoCutKey(pos.ix[-1, str_NPOI_ZSCORE], step)
+    npoi_chg_zs_key= tf.histoCutKey(pos.ix[-1, str_NPOI_CHG_ZSCORE], step)
     histRef = pd.DataFrame(columns = result.columns)
     i = 0    
     while i < len(result.index):
-        if result[str_LONG_ZS_KEY][i] == long_zs_key and result[str_SHORT_ZS_KEY][i] == short_zs_key:
+        if result[str_NPOI_ZS_KEY][i] == npoi_zs_key and result[str_NPOI_CHG_ZS_KEY][i] == npoi_chg_zs_key:
             histRef = histRef.append(result.ix[i])
         i += 1
         
