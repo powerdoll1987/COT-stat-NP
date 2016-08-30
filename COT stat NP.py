@@ -42,9 +42,9 @@ if __name__ == '__main__':
     const_price_roll_span = 40 # 计算未来return用的日数
     
     # 读入数据
-    pos = pd.read_excel('CLA COT NP.xls', sheetname = 'Sheet1 (2)')
+    pos = pd.read_excel('INPUT COT NP.xls', sheetname = 'Sheet1 (2)')
     pos.set_index('Date', inplace = True)
-    price = pd.read_excel('CLA COT NP.xls', sheetname = 'Sheet2')
+    price = pd.read_excel('INPUT COT NP.xls', sheetname = 'Sheet2')
     label = price.columns[0]
     price.set_index(label, inplace = True)
 
